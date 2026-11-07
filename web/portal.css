@@ -540,6 +540,8 @@ legend { font-size: 12px; color: var(--pink) }
 #social-search-form { display: flex; align-items: center; gap: 12px; width: min(100%,520px); }
 #social-search-form .search-field { flex: 1; width: auto; min-width: 0; flex-direction: row; margin: 0; }
 #social-search-form>button { flex-shrink: 0; font-size: 12px; padding: 11px 18px; }
+.social-sort { display: flex; align-items: center; gap: 8px; margin: 0; white-space: nowrap }
+.social-sort select { width: auto }
 .social-admin-switch { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 12px; color: var(--muted); }
 .social-admin-switch input { width: auto; }
 .social-policy { margin: 20px 0; color: var(--muted); font-size: 12px; }
@@ -562,6 +564,11 @@ legend { font-size: 12px; color: var(--pink) }
 .social-comment.is-hidden { opacity: .72; }
 .social-comment>.meta { margin: 0 0 10px; }
 .social-comment-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.social-votes { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; max-width: 100%; }
+.social-votes button { font-size: 12px; padding: 8px 10px; }
+.social-votes button[aria-pressed=true] { color: #25152d; background: var(--pink); border-color: var(--pink); }
+.social-vote-score, .social-vote-feedback { color: var(--muted); font-size: 12px; }
+.social-vote-feedback:empty { display: none; }
 .social-comment-actions button { font-size: 11px; padding: 6px 10px; }
 #social-comment-form { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 23px; }
 #social-find-post { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
@@ -581,3 +588,8 @@ legend { font-size: 12px; color: var(--pink) }
 }
 
 #social-detail-title { min-width: 0; overflow-wrap: anywhere; } #social-compose-status,#social-comment-status,#social-action-status { overflow-wrap: anywhere; }
+#social-detail-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+#social-detail-dialog .dialog-heading { margin-bottom: 12px; }
+#social-detail-dialog .dialog-heading .icon { flex: 0 0 44px; min-height: 44px; }
+.social-detail-scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 2px 4px 4px; }
+.social-detail-scroll:focus-visible { outline-offset: -2px; }

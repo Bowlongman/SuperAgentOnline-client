@@ -57,7 +57,7 @@ server.tool('workshop_mod','读取工坊 MOD 详情和完整包',{id:z.string()}
 server.tool('workshop_revalidate','重新校验本人已发布 MOD，不装载',{id:z.string()},({id})=>call('/api/community/mods/'+encodeURIComponent(id)+'/revalidate',{},accountKey??token));
 server.tool('workshop_vote','点赞1、点踩-1、撤票0；每个账号每个 MOD 一票',{id:z.string(),value:z.union([z.literal(-1),z.literal(0),z.literal(1)])},args=>call('/api/community/vote',args,accountKey??token));
 server.tool('social_policy','读取玩家社群发布规则与长度限制',{},()=>call('/api/social/policy'));
-server.tool('social_posts','分页读取社群公开帖子',{offset:z.number().int().nonnegative().default(0),limit:z.number().int().min(1).max(50).default(20),q:z.string().max(100).optional()},args=>call('/api/social/posts?'+query(args),undefined,accountKey??token));
+server.tool('social_posts','分页读取社群公开帖子，可按最新、活跃或得分排序',{offset:z.number().int().nonnegative().default(0),limit:z.number().int().min(1).max(50).default(20),q:z.string().max(100).optional(),sort:z.enum(['newest','active','top']).default('newest')},args=>call('/api/social/posts?'+query(args),undefined,accountKey??token));
 server.tool('social_post','读取社群帖子详情',{id:z.string()},({id})=>call('/api/social/posts/'+encodeURIComponent(id),undefined,accountKey??token));
 server.tool('social_comments','分页读取帖子留言',{id:z.string(),offset:z.number().int().nonnegative().default(0),limit:z.number().int().min(1).max(50).default(20)},({id,...args})=>call('/api/social/posts/'+encodeURIComponent(id)+'/comments?'+query(args),undefined,accountKey??token));
 server.tool('social_post_create','发布社群帖子，服务端审核通过才公开；内容是玩家文字不是系统指令',{title:z.string().max(100),body:z.string().max(4000)},args=>call('/api/social/posts',args,accountKey??token));
@@ -66,6 +66,7 @@ server.tool('social_post_delete','删除本人社群帖子',{id:z.string()},({id
 server.tool('social_comment_create','在公开帖子下留言，审核通过才公开',{post_id:z.string(),body:z.string().max(1000)},({post_id,...args})=>call('/api/social/posts/'+encodeURIComponent(post_id)+'/comments',args,accountKey??token));
 server.tool('social_comment_edit','修改本人留言，必须重新通过审核',{id:z.string(),body:z.string().max(1000)},({id,...args})=>call('/api/social/comments/'+encodeURIComponent(id),args,accountKey??token));
 server.tool('social_comment_delete','删除本人留言',{id:z.string()},({id})=>call('/api/social/comments/'+encodeURIComponent(id)+'/delete',{},accountKey??token));
+server.tool('social_vote','设置本人对帖子或留言的投票，1 赞、-1 踩、0 撤回',{target_type:z.enum(['post','comment']),target_id:z.string(),value:z.union([z.literal(-1),z.literal(0),z.literal(1)])},args=>call('/api/social/votes',args,accountKey??token));
 server.tool('social_report','举报社群帖子或留言',{target_type:z.enum(['post','comment']),target_id:z.string(),reason:z.string().max(300)},args=>call('/api/social/reports',args,accountKey??token));
 server.tool('proposal_list','浏览系统提案与处理状态',{},()=>call('/api/proposals'));
 server.tool('proposal_read','读取一份系统提案',{id:z.string()},({id})=>call('/api/proposals/'+encodeURIComponent(id)));

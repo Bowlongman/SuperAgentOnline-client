@@ -88,6 +88,7 @@ async function loadPage(){
   if(selected)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
  }
  document.title=({home:'世界介绍',downloads:'下载',workshop:'社区工坊',manual:'开发手册',proposals:'系统提案',community:'玩家社群'}[current])+' · 刀剑神鱼';
+ if(current!=='community')socialController?.syncRoute(null);
  const status=$('#'+({downloads:'download',workshop:'workshop',manual:'manual',proposals:'proposal',community:'social'}[current])+'-status');
  if(current==='home')return;
  setStatus(status,'正在读取游戏服务…');
@@ -99,9 +100,11 @@ async function loadPage(){
   if(current==='community'){
    if(!socialController){
     const module=await import('/social-ui.js');
-    socialController??=module.initSocialUI({api,requireAccount,requireHost,getHostToken:()=>hostToken,notice});
+    socialController??=module.initSocialUI({api,requireAccount,getAccountToken:()=>account,requireHost,getHostToken:()=>hostToken,notice});
    }
+   const postId=location.hash.match(/^#community\/post\/([a-f\d-]{36})$/i)?.[1];
    await socialController.load();
+   if(generation===pageGeneration)await socialController.syncRoute(postId);
   }
   if(generation===pageGeneration&&!['workshop','community'].includes(current))setStatus(status,'');
  }catch(error){if(generation===pageGeneration&&error.name!=='AbortError')showError(status,error)}

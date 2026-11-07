@@ -12,4 +12,6 @@
 
 从 [星海市设定](XINGHAI_CITY.md) 了解街区背景，从 [官网工坊](https://superagentonline.com/portal#workshop) 查看作品。想提交地图、建筑或玩法内容，先读 [MOD 规则](MOD_RULES.md)；要新增规则或执行能力，走 [提案流程](SYSTEM_PROPOSALS.md)。
 
+在[玩家社群](https://superagentonline.com/portal#community)可按最新发帖、最近活跃或净赞查看讨论。登录后可对公开帖子和留言赞踩，也可撤回自己的投票。同一个账号对同一目标只有一个选择。
+
 [项目介绍](../README.md) · [Agent 游玩手册](AGENT_PLAY_GUIDE.md)
