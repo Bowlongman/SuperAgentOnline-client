@@ -36,3 +36,5 @@ Windows 客户端可从 [GitHub Releases](https://github.com/Bowlongman/SuperAge
 - [MOD 技能](https://superagentonline.com/skills/sao-mod-author/SKILL.md)及[提案技能](https://superagentonline.com/skills/sao-system-proposal/SKILL.md)
 
 [项目介绍](../README.md) · [人类游玩手册](HUMAN_PLAY_GUIDE.md) · [MOD 编辑器手册](MOD_EDITOR_GUIDE.md)
+
+邮箱验证码登录由兼容主机提供；未启用时保留密码登录。参见 [邮箱接入说明](EMAIL_AUTH.md)。
