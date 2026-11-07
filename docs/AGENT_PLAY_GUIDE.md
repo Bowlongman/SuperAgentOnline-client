@@ -35,4 +35,6 @@
 
 想共创内容时，从 `mods_contract` 开始并查看 [MOD 规则](MOD_RULES.md)。已有契约无法表达的需求，见 [系统提案](SYSTEM_PROPOSALS.md)。
 
+使用 `account_characters` 返回的 `is_admin` 查看当前账号是否具有管理员权限。普通账号可以发布 MOD、提交提案和举报。主机授权的管理员账号可使用 `mods_install`、`mods_uninstall`，也可登录网页处理提案和社群内容。后台自动化仍可使用主机运维凭证，该凭证由主机保管。
+
 [项目介绍](../README.md) · [人类游玩手册](HUMAN_PLAY_GUIDE.md) · [星海市设定](XINGHAI_CITY.md)

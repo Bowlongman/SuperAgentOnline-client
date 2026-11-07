@@ -1,8 +1,8 @@
-export function initSocialUI({api,requireAccount,getAccountToken,requireHost,getHostToken,notice}){
+export function initSocialUI({api,requireAccount,getAccountToken,isAdmin,notice}){
  const $=selector=>document.querySelector(selector),base='/api/social',limit=12;
  let postOffset=0,commentOffset=0,reportOffset=0,postPage,commentPage,reportPage,activePost;
  let listEpoch=0,detailEpoch=0,commentEpoch=0,reportEpoch=0,listRequest,composeTarget,actionTarget;
- let postQuery='',linkedPost;
+ let postQuery='',linkedPost,identityEpoch=0;
  const pendingVotes=new Set();
  const node=(tag,text,className)=>{
   const element=document.createElement(tag);if(text!==undefined)element.textContent=text;if(className)element.className=className;return element;
@@ -20,8 +20,6 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
   try{await operation()}catch(error){showError(target,error)}
   finally{control.disabled=false}
  }
- const admin=()=>$('#social-admin-mode').checked;
- const readOptions=()=>admin()?{key:getHostToken()}:{};
  function time(value){return new Date(value).toLocaleString('zh-CN',{dateStyle:'medium',timeStyle:'short'})}
  function metadata(item){
   const meta=node('div',undefined,'meta');
@@ -44,7 +42,7 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
   const list=$('#social-posts');list.setAttribute('aria-busy','true');$('#social-retry').hidden=true;pager('social',postPage,postOffset,true);
   status($('#social-status'),'正在读取玩家社群…');
   try{
-   const result=await api(base+'/posts?'+new URLSearchParams({q:postQuery,sort:$('#social-sort').value,offset:postOffset,limit}),{...readOptions(),signal:listRequest.signal});
+   const result=await api(base+'/posts?'+new URLSearchParams({q:postQuery,sort:$('#social-sort').value,offset:postOffset,limit}),{signal:listRequest.signal});
    if(epoch!==listEpoch||$('#community').hidden)return;
    if(!result.posts.length&&result.offset>0&&result.offset>=result.total){postOffset=Math.max(0,Math.floor((result.total-1)/limit)*limit);return load()}
    postPage=result;postOffset=result.offset;list.replaceChildren();
@@ -56,8 +54,8 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
    }
    if(!result.posts.length)list.append(node('p','还没有匹配的帖子，可以换个搜索词或分享你的故事。','empty'));
    status($('#social-status'),'共 '+result.total+' 篇公开帖子');pager('social',result,postOffset);
-   $('#social-admin-panel').hidden=!admin();
-   if(admin())await loadReports();
+   $('#social-admin-panel').hidden=!isAdmin();
+   if(isAdmin())await loadReports();
   }catch(error){
    if(epoch!==listEpoch||error.name==='AbortError')return;
    list.replaceChildren();$('#social-retry').hidden=false;showError($('#social-status'),error);pager('social',null,postOffset);
@@ -74,7 +72,7 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
   if(item.can_edit)container.append(button('编辑',()=>openCompose(type,item)));
   if(item.can_delete)container.append(button('删除',()=>openAction('delete',type,item)));
   if(item.status==='public')container.append(button('举报',()=>{if(requireAccount())openAction('report',type,item)}));
-  if(item.can_moderate)container.append(button(item.status==='hidden'?'恢复公开':'主机隐藏',()=>openAction(item.status==='hidden'?'restore':'hide',type,item)));
+  if(isAdmin()&&item.can_moderate)container.append(button(item.status==='hidden'?'恢复公开':'主机隐藏',()=>openAction(item.status==='hidden'?'restore':'hide',type,item)));
  }
  function renderVotes(group,votes,busy){
   for(const control of group.querySelectorAll('button')){
@@ -91,7 +89,7 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
   const key=type+':'+item.id,group=node('div',undefined,'social-votes');
   group.dataset.voteTarget=key;group.setAttribute('role','group');
   group.setAttribute('aria-label',type==='post'?'帖子投票':'留言投票');
-  if(!admin())for(const value of [1,-1]){
+  for(const value of [1,-1]){
    const control=button('',()=>submitVote(type,item.id,control));
    control.dataset.vote=value;group.append(control);
   }
@@ -103,7 +101,7 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
  async function submitVote(type,id,control){
   const key=type+':'+id;
   if(pendingVotes.has(key)||!requireAccount())return;
-  const account=getAccountToken();
+  const account=getAccountToken(),identity=identityEpoch;
   const value=control.getAttribute('aria-pressed')==='true'?0:Number(control.dataset.vote);
   const groups=()=>[...document.querySelectorAll('.social-votes')].filter(group=>group.dataset.voteTarget===key);
   const setPending=busy=>{
@@ -116,14 +114,14 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
   for(const group of groups())status(group.querySelector('.social-vote-feedback'),'正在提交投票…');
   try{
    const result=await api(base+'/votes',{method:'POST',key:account,body:{target_type:type,target_id:id,value}});
-   if(getAccountToken()!==account||admin())return;
+   if(identity!==identityEpoch)return;
    const reorder=type==='post'&&$('#social-sort').value==='top'?'。刷新列表可更新排名。':'';
    for(const group of groups()){
     renderVotes(group,result.votes,true);
     status(group.querySelector('.social-vote-feedback'),(value===0?'已取消投票':'投票已更新')+reorder);
    }
   }catch(error){
-   if(getAccountToken()!==account||admin())return;
+   if(identity!==identityEpoch)return;
    for(const group of groups()){
     const feedback=group.querySelector('.social-vote-feedback');
     if(error.status===429)status(feedback,'投票操作过于频繁，请稍后再试。',true);
@@ -165,7 +163,7 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
   status($('#social-detail-status'),'正在读取…');status($('#social-comment-status'),'');
   if(!$('#social-detail-dialog').open)$('#social-detail-dialog').showModal();
   try{
-   const result=await api(base+'/posts/'+encodeURIComponent(id),readOptions());
+   const result=await api(base+'/posts/'+encodeURIComponent(id));
    if(epoch!==detailEpoch)return;
    activePost=result.post??result;renderPost(activePost);await loadComments();
    status($('#social-detail-status'),'');
@@ -189,7 +187,7 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
   if(!activePost)return;
   const id=activePost.id,epoch=detailEpoch;
   try{
-   const result=await api(base+'/posts/'+id,readOptions());
+   const result=await api(base+'/posts/'+id);
    if(epoch!==detailEpoch)return;
    renderPost(result.post??result);await loadComments();
   }catch(error){
@@ -205,7 +203,7 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
   const id=activePost.id,epoch=++commentEpoch;
   pager('social-comments',commentPage,commentOffset,true);status($('#social-comments-status'),'正在读取留言…');
   try{
-   const result=await api(base+'/posts/'+id+'/comments?'+new URLSearchParams({offset:commentOffset,limit}),readOptions());
+   const result=await api(base+'/posts/'+id+'/comments?'+new URLSearchParams({offset:commentOffset,limit}));
    if(epoch!==commentEpoch||activePost?.id!==id)return;
    if(!result.comments.length&&result.offset>0&&result.offset>=result.total){commentOffset=Math.max(0,Math.floor((result.total-1)/limit)*limit);return loadComments()}
    commentPage=result;commentOffset=result.offset;const list=$('#social-comments');list.replaceChildren();
@@ -224,12 +222,13 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
   run(event.submitter,$('#social-comment-status'),async()=>{
    await api(base+'/posts/'+id+'/comments',{method:'POST',body:Object.fromEntries(new FormData(form))});
    if(epoch!==detailEpoch)return;
-   form.reset();const result=await api(base+'/posts/'+id+'/comments?'+new URLSearchParams({offset:0,limit}),readOptions());
+   form.reset();const result=await api(base+'/posts/'+id+'/comments?'+new URLSearchParams({offset:0,limit}));
    commentOffset=Math.max(0,Math.floor((result.total-1)/limit)*limit);
    await refreshDetail();status($('#social-comment-status'),'留言已发布。');await load();
   });
  };
  $('#social-detail-dialog').addEventListener('close',()=>{
+  if($('#social-detail-dialog').open)return;
   if(linkedPost&&location.hash===postHash(linkedPost))history.replaceState(null,'','#community');
   linkedPost=null;++detailEpoch;++commentEpoch;activePost=null;$('#social-comment-form').reset();
  });
@@ -245,12 +244,12 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
  }
  $('#social-action-form').onsubmit=event=>{
   event.preventDefault();const target=actionTarget;
-  if(['hide','restore'].includes(target.action)){if(!requireHost())return}
+  if(['hide','restore'].includes(target.action)){if(!isAdmin())return}
   else if(!requireAccount())return;
   const fields=Object.fromEntries(new FormData(event.currentTarget));
   run(event.submitter,$('#social-action-status'),async()=>{
    if(target.action==='delete')await api(base+'/'+(target.type==='post'?'posts/':'comments/')+target.item.id+'/delete',{method:'POST',body:{}});
-   else await api(base+(target.action==='report'?'/reports':'/moderate'),{method:'POST',body:{target_type:target.type,target_id:target.item.id,reason:fields.reason,...(target.action==='report'?{}:{action:target.action})},...(target.action==='report'?{}:{key:getHostToken()})});
+   else await api(base+(target.action==='report'?'/reports':'/moderate'),{method:'POST',body:{target_type:target.type,target_id:target.item.id,reason:fields.reason,...(target.action==='report'?{}:{action:target.action})}});
    $('#social-action-dialog').close();notice(target.action==='report'?'举报已提交到主机管理端。':'内容状态已更新。');
    if(target.type==='post'&&target.action==='delete'&&activePost?.id===target.item.id)$('#social-detail-dialog').close();
    else if(activePost&&target.action!=='report')await refreshDetail();
@@ -264,12 +263,12 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
  $('#social-prev').onclick=async()=>{postOffset=Math.max(0,postOffset-limit);await load();revealStatus($('#social-status'))};
  $('#social-next').onclick=async()=>{if(postPage?.next_offset==null)return;postOffset=postPage.next_offset;await load();revealStatus($('#social-status'))};
  async function loadReports(){
-  if(!admin())return;
+  if(!isAdmin())return;
   const epoch=++reportEpoch;pager('social-reports',reportPage,reportOffset,true);
   status($('#social-reports-status'),'正在读取举报记录…');
   try{
-   const result=await api(base+'/reports?'+new URLSearchParams({offset:reportOffset,limit}),{key:getHostToken()});
-   if(epoch!==reportEpoch||!admin())return;
+   const result=await api(base+'/reports?'+new URLSearchParams({offset:reportOffset,limit}));
+   if(epoch!==reportEpoch||!isAdmin())return;
    reportPage=result;reportOffset=result.offset;const list=$('#social-reports');list.replaceChildren();
    for(const report of result.reports){
     const item=node('article',undefined,'social-report');
@@ -281,29 +280,27 @@ export function initSocialUI({api,requireAccount,getAccountToken,requireHost,get
    }
    if(!result.reports.length)list.append(node('p','还没有举报记录。','empty'));
    status($('#social-reports-status'),'共 '+result.total+' 条举报记录');pager('social-reports',result,reportOffset);
-  }catch(error){if(epoch===reportEpoch&&admin()){showError($('#social-reports-status'),error);pager('social-reports',null,reportOffset)}}
+  }catch(error){if(epoch===reportEpoch&&isAdmin()){showError($('#social-reports-status'),error);pager('social-reports',null,reportOffset)}}
  }
  $('#social-reports-refresh').onclick=loadReports;
  $('#social-reports-prev').onclick=()=>{reportOffset=Math.max(0,reportOffset-limit);loadReports()};
  $('#social-reports-next').onclick=()=>{if(reportPage?.next_offset!=null){reportOffset=reportPage.next_offset;loadReports()}};
  $('#social-find-post').onsubmit=event=>{event.preventDefault();openPost(new FormData(event.currentTarget).get('id').trim())};
- $('#social-host-token').onclick=()=>$('#host-dialog').showModal();
- $('#social-admin-mode').onchange=()=>{
-  ++reportEpoch;$('#social-reports').replaceChildren();$('#social-audit-list').replaceChildren();status($('#social-audit-status'),'');
-  if(admin()&&!requireHost())$('#social-admin-mode').checked=false;
-  $('#social-admin-panel').hidden=!admin();reportOffset=0;load();
- };
  function refreshIdentity(){
-  ++reportEpoch;$('#social-admin-mode').checked=false;$('#social-admin-panel').hidden=true;$('#social-reports').replaceChildren();$('#social-audit-list').replaceChildren();status($('#social-audit-status'),'');
-  if($('#social-detail-dialog').open)$('#social-detail-dialog').close();
-  if(!$('#community').hidden)load();
+  ++identityEpoch;++reportEpoch;++listEpoch;++detailEpoch;++commentEpoch;listRequest?.abort();
+  reportOffset=0;reportPage=null;activePost=null;linkedPost=null;composeTarget=null;actionTarget=null;
+  $('#social-admin-panel').hidden=true;$('#social-audit').open=false;
+  for(const id of ['social-reports','social-audit-list','social-posts','social-detail-meta','social-detail-actions','social-comments'])$('#'+id).replaceChildren();
+  for(const id of ['social-audit-status','social-reports-status','social-detail-body','social-detail-title','social-action-target'])$('#'+id).textContent='';
+  for(const id of ['social-find-post','social-comment-form','social-action-form','social-compose-form'])$('#'+id).reset();
+  for(const id of ['social-detail-dialog','social-action-dialog','social-compose-dialog'])$('#'+id).close();
  }
  $('#social-audit-refresh').onclick=async()=>{
-  if(!admin()||!requireHost())return;
-  const key=getHostToken(),epoch=reportEpoch;
+  if(!isAdmin())return;
+  const key=getAccountToken(),epoch=reportEpoch;
   await run($('#social-audit-refresh'),$('#social-audit-status'),async()=>{
    const result=await api(base+'/audit?limit=12',{key});
-   if(!admin()||key!==getHostToken()||epoch!==reportEpoch)return;
+   if(!isAdmin()||key!==getAccountToken()||epoch!==reportEpoch)return;
    const list=$('#social-audit-list');list.replaceChildren();
    for(const event of result.events){
     const item=node('article',undefined,'social-report');

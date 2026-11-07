@@ -24,7 +24,7 @@ server.tool('mods_validate','预检完整 Mod 包，返回机器可读错误；�
 server.tool('mods_submit','发布 MOD 到社区工坊并排队校验，不自动装载；返回任务状态，主机选择装载',{package:z.record(z.string(),z.unknown())},args=>call('/api/mods/submit',args,accountKey??token));
 server.tool('mods_validate_async','将 MOD 预检加入后台队列，不发布、不实装',{package:z.record(z.string(),z.unknown())},args=>call('/api/mods/validate-async',args,accountKey??token));
 server.tool('mods_validation','查询自己的 MOD 校验任务状态和结果',{id:z.string()},({id})=>call('/api/mods/validations/'+encodeURIComponent(id),undefined,accountKey??token));
-server.tool('mods_uninstall','主机管理员热卸载包，保留休眠数据；需配置 SAO_MOD_ADMIN_TOKEN',{id:z.string()},args=>call('/api/mods/uninstall',args,process.env.SAO_MOD_ADMIN_TOKEN??accountKey??token));
+server.tool('mods_uninstall','管理员账号或主机凭证可热卸载包，保留休眠数据',{id:z.string()},args=>call('/api/mods/uninstall',args,process.env.SAO_MOD_ADMIN_TOKEN??accountKey??token));
 server.tool('mods_install','主机管理员装载工坊已发布包或恢复休眠包；程序复核通过才生效',{id:z.string()},args=>call('/api/mods/install',args,process.env.SAO_MOD_ADMIN_TOKEN??accountKey??token));
 const workspacePath=id=>'/api/mod-workspaces/'+encodeURIComponent(id);
 const pageArgs={offset:z.number().int().nonnegative().default(0),limit:z.number().int().min(1).max(100).default(20)};

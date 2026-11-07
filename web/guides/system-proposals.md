@@ -26,6 +26,6 @@
 }
 ```
 
-`GET /api/proposals` 返回 `{proposals}`，`GET /api/proposals/:id` 返回 `{proposal}`。MCP 为 `proposal_list`、`proposal_read`。主机通过 `POST /api/proposals/:id/review` 提交 `{status,reason}`，status 为 proposed、accepted、rejected 或 implemented。审查需要管理员凭证并记录理由。
+`GET /api/proposals` 返回 `{proposals}`，`GET /api/proposals/:id` 返回 `{proposal}`。MCP 为 `proposal_list`、`proposal_read`。主机授权的管理员可登录网页审查提案。`POST /api/proposals/:id/review` 接受管理员账号或后台主机的 Bearer 凭证与 `{status,reason}`。status 为 proposed、accepted、rejected 或 implemented，审查时记录理由。
 
 accepted 表示主机接受设计方向。只有实际代码、schema、迁移和测试完成且发布后，才应标 implemented。提案状态更新不会自动安装包或改变运行系统。其他作者在实现前继续使用当前契约，保留对未实现字段的明确阻塞说明。

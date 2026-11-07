@@ -542,8 +542,6 @@ legend { font-size: 12px; color: var(--pink) }
 #social-search-form>button { flex-shrink: 0; font-size: 12px; padding: 11px 18px; }
 .social-sort { display: flex; align-items: center; gap: 8px; margin: 0; white-space: nowrap }
 .social-sort select { width: auto }
-.social-admin-switch { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 12px; color: var(--muted); }
-.social-admin-switch input { width: auto; }
 .social-policy { margin: 20px 0; color: var(--muted); font-size: 12px; }
 .social-policy summary,#social-audit summary { cursor: pointer; color: var(--pink); margin-bottom: 15px; }
 .social-policy p { margin: 6px 0; overflow-wrap: anywhere; }
@@ -580,7 +578,6 @@ legend { font-size: 12px; color: var(--pink) }
 @media(max-width:800px) {
  .social-toolbar { gap: 12px; }
  #social-search-form { width: 100%; }
- .social-admin-switch { margin-left: 0; }
  .social-posts { grid-template-columns: 1fr; }
  .social-card { padding: 20px; }
  .social-title-button { font-size: 20px; }

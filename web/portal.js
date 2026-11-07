@@ -9,7 +9,7 @@ const node=(tag,text,className)=>{
 const action=(text,handler,className)=>{
  const button=node('button',text,className);button.type='button';button.onclick=handler;return button;
 };
-let account=sessionStorage.getItem('sao-account'),hostToken='',scope='all',pageGeneration=0,detailGeneration=0,manualGeneration=0,workshopMods=[];
+let account=sessionStorage.getItem('sao-account'),isAdmin=false,roleRequest,accountEpoch=0,scope='all',pageGeneration=0,detailGeneration=0,manualGeneration=0,workshopMods=[];
 const workshopLimit=12;
 let workshopOffset=0,workshopPage=null,workshopRequest,workshopSearchTimer,workshopPollTimer,detailPollTimer,socialController;
 const typeLabels={new_system:'新增系统',change_rules:'修改规则',change_content:'修改内容'};
@@ -17,10 +17,11 @@ const statusLabels={pending:'待评审',accepted:'已采纳',approved:'已通过
 function notice(message){$('#notice').textContent=message;clearTimeout(notice.timer);notice.timer=setTimeout(()=>$('#notice').textContent='',5000)}
 function errorText(error){return error.message||'请求失败，请重试。'}
 async function api(path,{method='GET',body,key=account,signal}={}){
+ const epoch=accountEpoch;
  const response=await fetch(path,{method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(key?{Authorization:'Bearer '+key}:{})},body:body?JSON.stringify(body):undefined,signal});
  const value=await response.json();
  if(!response.ok){
-  if(response.status===401&&key&&key===account){account=null;sessionStorage.removeItem('sao-account');authView()}
+  if(response.status===401&&key&&key===account&&epoch===accountEpoch){setAccount(null);queueMicrotask(loadPage)}
   const error=new Error(value.error||'请求失败');
   error.issues=value.issues;error.status=response.status;throw error;
  }
@@ -42,9 +43,24 @@ function requireAccount(){
  if(account)return true;
  $('#account-dialog').showModal();notice('请先登录玩家账户。');return false;
 }
-function requireHost(){
- if(hostToken)return true;
- $('#host-dialog').showModal();notice('此操作需要主机管理口令。');return false;
+function setAccount(key){
+ if(key===account)return;
+ account=key;isAdmin=false;roleRequest=null;++accountEpoch;
+ if(key)sessionStorage.setItem('sao-account',key);else sessionStorage.removeItem('sao-account');
+ clearTimeout(detailPollTimer);++detailGeneration;
+ $('#detail-dialog').close();$('#detail-body').replaceChildren();
+ socialController?.refreshIdentity();authView();
+}
+function loadAccountRole(){
+ if(!account)return;
+ if(roleRequest)return roleRequest;
+ const key=account,epoch=accountEpoch;
+ roleRequest=api('/api/account',{key}).then(value=>{
+  if(epoch===accountEpoch)isAdmin=value.is_admin===true;
+ }).catch(()=>{
+  if(epoch===accountEpoch){isAdmin=false;roleRequest=null}
+ });
+ return roleRequest;
 }
 async function run(button,status,operation){
  button.disabled=true;setStatus(status,'正在处理…');
@@ -55,26 +71,20 @@ for(const button of document.querySelectorAll('[data-close]'))button.onclick=()=
 $('#account-open').onclick=()=>$('#account-dialog').showModal();
 $('#account-logout').onclick=()=>{
  revokeEmailSession(account);
- account=null;sessionStorage.removeItem('sao-account');authView();notice('已退出门户账户。');loadPage();
+ setAccount(null);notice('已退出门户账户。');loadPage();
 };
 void installEmailAuth({getAccount:()=>account,onSignedIn:result=>{
- account=result.account_token;sessionStorage.setItem('sao-account',account);
- $('#account-dialog').close();authView();notice('登录成功，可进入世界或继续参与社区。');loadPage();
+ setAccount(result.account_token);
+ $('#account-dialog').close();notice('登录成功，可进入世界或继续参与社区。');loadPage();
 },onBound:()=>{$('#account-dialog').close();notice('邮箱已绑定，可使用验证码登录。')}});
 $('#login-form').onsubmit=event=>{
  event.preventDefault();const form=event.currentTarget,button=event.submitter;
  run(button,form.querySelector('[role=status]'),async()=>{
   const fields=Object.fromEntries(new FormData(form)),value=await api('/api/'+button.value,{method:'POST',body:fields,key:null});
-  account=value.account_token;sessionStorage.setItem('sao-account',account);
-  form.reset();setStatus(form.querySelector('[role=status]'),'');$('#account-dialog').close();authView();notice('登录成功，可进入世界或继续参与社区。');loadPage();
+  setAccount(value.account_token);
+  form.reset();setStatus(form.querySelector('[role=status]'),'');$('#account-dialog').close();notice('登录成功，可进入世界或继续参与社区。');loadPage();
  });
 };
-$('#host-open').onclick=()=>$('#host-dialog').showModal();
-$('#host-form').onsubmit=event=>{
- event.preventDefault();hostToken=new FormData(event.currentTarget).get('token').trim();socialController?.refreshIdentity();
- event.currentTarget.reset();$('#host-dialog').close();notice('管理口令已用于本次页面会话。');
-};
-$('#host-clear').onclick=()=>{hostToken='';socialController?.refreshIdentity();$('#host-form').reset();$('#host-dialog').close();notice('已清除管理口令。')};
 function currentPage(){
  if(location.hash==='#manual')history.replaceState(null,'',location.pathname+location.search+'#workshop/manual');
  if(location.hash==='#workshop/manual')return 'manual';
@@ -101,6 +111,7 @@ async function loadPage(){
  if(current==='home')return;
  setStatus(status,'正在读取游戏服务…');
  try{
+  await loadAccountRole();if(generation!==pageGeneration)return;
   if(current==='downloads')await loadDownloads(generation);
   if(current==='workshop')await loadMods(generation);
   if(current==='manual')await loadManual(generation);
@@ -108,7 +119,7 @@ async function loadPage(){
   if(current==='community'){
    if(!socialController){
     const module=await import('/social-ui.js');
-    socialController??=module.initSocialUI({api,requireAccount,getAccountToken:()=>account,requireHost,getHostToken:()=>hostToken,notice});
+    socialController??=module.initSocialUI({api,requireAccount,getAccountToken:()=>account,isAdmin:()=>isAdmin,notice});
    }
    const postId=location.hash.match(/^#community\/post\/([a-f\d-]{36})$/i)?.[1];
    await socialController.load();
@@ -216,16 +227,17 @@ async function vote(mod,value,button){
  });
 }
 async function manageMod(mod,install,button,status=$('#workshop-status')){
- if(!requireHost())return;
- const generation=detailGeneration;
+ if(!isAdmin)return;
+ const generation=detailGeneration,key=account;
  await run(button,status,async()=>{
   try{
-   await api('/api/mods/'+(install?'install':'uninstall'),{method:'POST',body:{id:mod.id},key:hostToken});
+   await api('/api/mods/'+(install?'install':'uninstall'),{method:'POST',body:{id:mod.id},key});
   }catch(error){
    if(generation!==detailGeneration){notice(errorText(error));return}
    if(install&&$('#detail-dialog').open)await modDetail(mod.id);
    throw error;
   }
+  if(key!==account)return;
   if(generation===detailGeneration&&$('#detail-dialog').open)$('#detail-dialog').close();
   await loadPage();notice(install?'主机已装载此 MOD。':'主机已卸载此 MOD。');
  });
@@ -352,9 +364,10 @@ async function modDetail(id){
    });
    revalidate.disabled=['queued','running'].includes(validationStatus(mod));
   });
-  controls.append(install,refresh,revalidate);
+  if(isAdmin)controls.append(install);
+  controls.append(refresh,revalidate);
   const version=installedVersion(mod);
-  if(version){const uninstall=action('从主机卸载',()=>manageMod(mod,false,uninstall,$('#detail-status')));controls.append(uninstall)}
+  if(isAdmin&&version){const uninstall=action('从主机卸载',()=>manageMod(mod,false,uninstall,$('#detail-status')));controls.append(uninstall)}
   body.append(controls);
   function updateState(){
    metadata.replaceChildren();appendModMetadata(metadata,mod);
@@ -465,19 +478,22 @@ async function proposalDetail(id){
   const proposal=value.proposal??value;$('#detail-title').textContent=proposal.title;
   body.append(tag(statusLabels[proposal.status]||proposal.status||'待评审',proposal.status==='accepted'));
   for(const [key,title] of Object.entries({type:'提案类型',summary:'概要',target_system:'目标系统',rules_version:'规则版本',design:'设计说明',compatibility:'兼容性与迁移',acceptance:'验收条件',state:'状态 state',decisions:'决策 decisions',result:'结果 result',reason:'评审意见'}))detailField(body,title,key==='type'?typeLabels[proposal.type]:proposal[key]);
+  if(!isAdmin){setStatus($('#detail-status'),'');return}
   const review=node('form',undefined,'review-form'),heading=node('h3','主机管理员评审');
   const label=node('label','评审结果'),select=node('select');select.name='status';
   for(const [value,text] of [['proposed','待讨论'],['accepted','已采纳'],['rejected','已拒绝'],['implemented','已实现']]){const option=node('option',text);option.value=value;select.append(option)}
   label.append(select);const reasonLabel=node('label','评审理由'),reason=node('textarea');reason.name='reason';reason.required=true;reason.rows=3;reasonLabel.append(reason);
   const submit=node('button','保存评审','primary');submit.type='submit';review.append(heading,label,reasonLabel,submit);
   review.onsubmit=event=>{
-   event.preventDefault();if(!requireHost())return;
+   event.preventDefault();if(!isAdmin)return;
+   const key=account;
    run(submit,$('#detail-status'),async()=>{
-    await api('/api/proposals/'+encodeURIComponent(id)+'/review',{method:'POST',key:hostToken,body:Object.fromEntries(new FormData(review))});
+    await api('/api/proposals/'+encodeURIComponent(id)+'/review',{method:'POST',key,body:Object.fromEntries(new FormData(review))});
+    if(key!==account)return;
     await proposalDetail(id);notice('评审意见已保存。');
    });
   };
-  body.append(review);setStatus($('#detail-status'),'评审需要主机管理口令；“已实现”表示主机人工记录的验收进度。');
+  body.append(review);setStatus($('#detail-status'),'“已实现”表示管理员人工记录的验收进度。');
  }catch(error){if(generation===detailGeneration)showError($('#detail-status'),error)}
 }
 $('#proposal-open').onclick=()=>{if(requireAccount())$('#proposal-dialog').showModal()};
