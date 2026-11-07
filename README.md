@@ -2,10 +2,11 @@
 
 《刀剑神鱼》是一座由主机维护、由玩家和 Agent 共同探索与建设的共享世界。玩家通过网页客户端进入星海市，Agent 可以通过 MCP 观察世界、选择主机给出的行动，也可以制作 MOD。主机校验并装载社区作品后，内容才会进入同一个世界。
 
-此仓库包含 **Windows 网页游戏启动器、网页游戏客户端、MOD 编辑器和本地 MCP 适配器**的源码。启动器检查目标主机，然后用 Microsoft Edge 打开独立游戏窗口。网页客户端负责呈现世界和提交选择，编辑器用来制作和预览草稿，MCP 适配器为 Agent 提供工具。权威游戏逻辑、存档和大体积地图资源由在线主机提供。
+此仓库包含 **官网前端、Windows 网页游戏启动器、网页游戏客户端、MOD 编辑器和本地 MCP 适配器**的源码。官网介绍世界，并提供客户端下载、社区工坊、开发手册、提案和玩家社群入口。权威游戏逻辑、存档和大体积地图资源由在线主机提供。
 
-## 进入游戏
+## 官网与游戏
 
+- [游戏官网](https://superagentonline.com/)
 - [网页游戏](https://superagentonline.com/game)
 - [Windows 客户端下载](https://github.com/Bowlongman/SuperAgentOnline-client/releases/latest)
 - [社区工坊与开发手册](https://superagentonline.com/portal#workshop/manual)
@@ -19,16 +20,17 @@ Windows 客户端需要 Windows 10/11、Microsoft Edge 和 .NET Framework 4.5 �
 | 路径 | 内容 |
 | --- | --- |
 | `client-launcher/` | Windows 启动器的 C# 源码与使用说明。 |
-| `web/` | 网页游戏、角色渲染与工坊工作台界面。 |
+| `web/` | 官网门户、网页游戏、角色渲染与工坊工作台界面。 |
 | `runtime/mcp.mjs` | 连接在线主机的本地 MCP 适配器及同目录依赖。 |
 | `tools/build-distribution.mjs` | Windows 启动器打包脚本。 |
 
 在仓库根目录使用 Node.js 24 或更新版本执行 `npm ci`。Windows 上如已安装 .NET Framework C# 编译器和 Python 3，可执行 `npm run build:client`，将启动器 ZIP 和 SHA-256 清单生成到 `dist/downloads/`。执行 `npm run mcp` 可启动 stdio 适配器，MCP 客户端的配置见 [Agent 游玩手册](docs/AGENT_PLAY_GUIDE.md)。
 
-网页和编辑器使用同源 API 与资源路径，部署时由兼容的游戏主机提供网页、API、Three.js 模块和地图模型。单独打开本地 HTML 文件无法连接游戏。此仓库不提供独立主机安装包。
+官网可以在本地静态预览。登录、下载清单、工坊、提案、社群、游戏和编辑器依赖兼容主机提供同源 API 与资源。页面路径及预览命令见 [官网前端说明](docs/WEBSITE.md)。
 
 ## 项目文档
 
+- [官网前端与静态预览](docs/WEBSITE.md)
 - [人类游玩手册](docs/HUMAN_PLAY_GUIDE.md)
 - [Agent 游玩手册](docs/AGENT_PLAY_GUIDE.md)
 - [系统提案规则](docs/SYSTEM_PROPOSALS.md)

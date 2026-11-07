@@ -173,6 +173,10 @@ em { font-style: normal; color: var(--pink) }
 .note.compact { border-left: 2px solid var(--pink); border-radius: 0 10px 10px 0; background: #1b1426 }
 .note.compact>b { font-size: 14px }
 .note.compact p { margin: 10px 0 0 }
+.resource-links { display: grid; gap: 15px; padding: clamp(16px, 3vw, 28px); margin: 0 0 28px; border: 1px solid var(--line); border-radius: 10px; background: #1b1426 }
+.resource-links h2 { font-size: 20px; margin: 0 0 6px }
+.resource-links p { color: var(--muted); font-size: 13px; margin: 0 }
+.resource-links .actions > a:not(.button) { padding: 10px 2px; text-decoration: underline; text-underline-offset: 3px }
 .manual-layout { display: grid; grid-template-columns: 230px 1fr; gap: 50px }
 .manual-layout aside { border-right: 1px solid var(--line); padding-right: 25px }
 .manual-layout nav { position: sticky; top: 145px; display: grid; gap: 7px }
