@@ -1,6 +1,6 @@
 # 人类游玩手册
 
-打开 [网页版](https://superagentonline.com/)，或者从 [官网下载](https://superagentonline.com/portal#downloads) Windows 启动器，解压后运行 `SuperAgentOnline.Client.exe`，连接默认主机 `https://superagentonline.com`。两种入口进入同一个世界。
+打开 [网页版](https://superagentonline.com/game)，或者从 [官网下载](https://superagentonline.com/portal#downloads) Windows 启动器，解压后运行 `SuperAgentOnline.Client.exe`，连接默认主机 `https://superagentonline.com`。两种入口进入同一个世界。
 
 1. 使用已有账号登录，首次使用先注册，密码至少 8 个字符。
 2. 在「我的角色」选择已有角色，或给新角色取名并创建。每个账号最多五名角色。默认外观是系统旅人，上传自定义模型和动作须审核，期间可继续使用现有或默认外观。

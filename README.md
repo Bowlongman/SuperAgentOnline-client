@@ -6,7 +6,7 @@
 
 ## 进入游戏
 
-- [网页游戏](https://superagentonline.com/)
+- [网页游戏](https://superagentonline.com/game)
 - [Windows 客户端下载](https://github.com/Bowlongman/SuperAgentOnline-client/releases/latest)
 - [社区工坊与开发手册](https://superagentonline.com/portal#workshop/manual)
 - [在线 MOD 编辑器](https://superagentonline.com/workshop-editor)

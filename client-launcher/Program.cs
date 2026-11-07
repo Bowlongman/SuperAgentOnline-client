@@ -112,23 +112,27 @@ namespace SuperAgentOnline.Client
             status.Text = "正在连接 " + origin;
             try
             {
+                string gameUrl = origin + "game";
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
                 using (HttpClientHandler handler = new HttpClientHandler { AllowAutoRedirect = false })
                 using (HttpClient client = new HttpClient(handler))
                 {
                     client.Timeout = TimeSpan.FromSeconds(6);
-                    using (HttpResponseMessage response = await client.GetAsync(origin, HttpCompletionOption.ResponseHeadersRead))
+                    HttpStatusCode statusCode = await CheckPage(client, gameUrl);
+                    if (statusCode == HttpStatusCode.NotFound)
                     {
-                        if (!response.IsSuccessStatusCode)
-                        {
-                            status.Text = "主机返回 HTTP " + (int)response.StatusCode + "。请确认游戏地址与主机运行状态。";
-                            return;
-                        }
+                        gameUrl = origin;
+                        statusCode = await CheckPage(client, gameUrl);
+                    }
+                    if ((int)statusCode < 200 || (int)statusCode >= 300)
+                    {
+                        status.Text = "主机返回 HTTP " + (int)statusCode + "。请确认游戏地址与主机运行状态。";
+                        return;
                     }
                 }
                 Process.Start(new ProcessStartInfo {
                     FileName = edge,
-                    Arguments = "--app=\"" + origin + "\"",
+                    Arguments = "--app=\"" + gameUrl + "\"",
                     UseShellExecute = false,
                     WorkingDirectory = Path.GetDirectoryName(edge)
                 });
@@ -150,6 +154,14 @@ namespace SuperAgentOnline.Client
             {
                 connect.Enabled = true;
                 host.Enabled = true;
+            }
+        }
+
+        private static async Task<HttpStatusCode> CheckPage(HttpClient client, string url)
+        {
+            using (HttpResponseMessage response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+            {
+                return response.StatusCode;
             }
         }
 
