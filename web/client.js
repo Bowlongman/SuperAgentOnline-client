@@ -1,4 +1,5 @@
 import {worldCamera} from '/world-camera.js';
+import {installEmailAuth,revokeEmailSession} from '/email-auth.js';
 const $=selector=>document.querySelector(selector);
 const renderCamera=worldCamera($('#world-camera'));
 let token=sessionStorage.getItem('sao-token'),snap,build,busy=false;
@@ -298,7 +299,12 @@ function leaveGame(){
   avatarReady?.then(play=>play?.dispose());avatarReady=null;$('#game').hidden=true;
 }
 $('#switch').onclick=async()=>{leaveGame();showEntry();try{if(accountKey)await refreshRoster();else $('output').textContent='请重新登录以管理角色。';}catch(e){$('output').textContent=e.message;}};
-$('#logout').onclick=()=>{leaveGame();accountKey=null;rosterData=null;editingCharacter=null;characterCount=0;sessionStorage.removeItem('sao-account');showEntry();$('output').textContent='已退出账号';};
+$('#logout').onclick=()=>{revokeEmailSession(accountKey);leaveGame();accountKey=null;rosterData=null;editingCharacter=null;characterCount=0;sessionStorage.removeItem('sao-account');showEntry();$('output').textContent='已退出账号';};
+void installEmailAuth({getAccount:()=>accountKey,onSignedIn:result=>{
+  accountKey=result.account_token;sessionStorage.setItem('sao-account',accountKey);
+  characterCount=result.characters?.length??0;showEntry();
+  void refreshRoster().catch(error=>{$('output').textContent=error.message});
+},onBound:()=>{$('output').textContent='邮箱已绑定，可使用验证码登录。'}});
 async function sync(){
   try{
     const d=await api('/.well-known/sao-world');if(build&&build!==d.build){location.reload();return;}build=d.build;playerSystem=d.player_system;showEntry();

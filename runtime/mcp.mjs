@@ -72,10 +72,20 @@ server.tool('proposal_list','浏览系统提案与处理状态',{},()=>call('/ap
 server.tool('proposal_read','读取一份系统提案',{id:z.string()},({id})=>call('/api/proposals/'+encodeURIComponent(id)));
 server.tool('proposal_submit','提交系统提案；批准不会自动修改主机代码',{type:z.enum(['new_system','change_rules','change_content']),title:z.string(),summary:z.string(),target_system:z.string(),rules_version:z.string(),design:z.string(),compatibility:z.string(),acceptance:z.string(),state:z.string().optional(),decisions:z.string().optional(),result:z.string().optional()},args=>call('/api/proposals',args,accountKey??token));
 server.tool('rules_read','读取生效世界规则和 RULE 设计文档',{},()=>call('/api/rules'));
+server.tool('auth_config','读取邮箱验证码与旧密码登录是否可用',{},()=>call('/api/auth/config',undefined,null));
+server.tool('auth_email_send','发送注册、登录或绑定邮箱验证码；绑定须先登录原账号',{email:z.string().email(),purpose:z.enum(['register','login','bind'])},args=>call('/api/auth/email/send',args,args.purpose==='bind'?(accountKey??null):null));
+server.tool('auth_email_verify','验证邮箱验证码；注册时传入新的账号名 login',{challenge_id:z.string(),code:z.string().regex(/^\d{6}$/),login:z.string().optional()},args=>call('/api/auth/email/verify',args,accountKey??null));
+server.tool('auth_email_status','读取当前账号的邮箱绑定状态',{},()=>call('/api/auth/email/status',undefined,accountKey??null));
+server.tool('auth_logout','退出当前账号；主机可撤销邮箱会话',{},async()=>{
+ const key=accountKey;
+ const result=await call('/api/auth/logout',{},key??null);
+ if(!result.isError&&accountKey===key){accountKey=undefined;token=undefined;}
+ return result;
+});
 const upload=z.object({base64:z.string(),format:z.enum(['glb','gltf','fbx','obj']).optional()});
 const appearance=z.object({low_model:z.union([z.literal('traveler'),upload]).optional(),model:z.union([z.literal('traveler'),upload]).optional(),idle:z.union([z.literal('breathe'),upload]).optional(),moving:z.union([z.literal('walk'),upload]).optional()});
 for(const endpoint of ['register','login']){
- server.tool('player_'+endpoint,endpoint==='register'?'注册玩家':'登录并列出角色',{login:z.string(),password:z.string().min(8),...(endpoint==='register'?{appearance:appearance.optional()}:{})},args=>call('/api/'+endpoint,args,null));
+ server.tool('player_'+endpoint,endpoint==='register'?'邮箱验证关闭时使用密码注册玩家':'使用原账号密码登录并列出角色',{login:z.string(),password:z.string().min(8),...(endpoint==='register'?{appearance:appearance.optional()}:{})},args=>call('/api/'+endpoint,args,null));
 }
 server.tool('character_create','创建并进入角色，每位玩家最多五名',{name:z.string(),model:z.literal('traveler').default('traveler')},args=>call('/api/character',args,accountKey));
 server.tool('character_delete','永久删除本人指定角色并释放名额',{character_id:z.string()},args=>call('/api/character/delete',args,accountKey));

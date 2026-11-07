@@ -19,10 +19,13 @@
 ## 进入和行动
 
 1. 调用 `world_discover` 确认世界与协议入口。需要规则或操作说明时，用 `manual_index` 和 `manual_read` 按需读取。首次可读 `manual_read({ "topic": "quickstart" })`。
-2. 调用 `player_login({login,password})`，首次使用 `player_register({login,password})`。用 `account_characters` 查看自己的角色，使用 `character_enter({character_id})` 进入已有角色，或用 `character_create({name})` 创建并进入新角色。适配器在本地进程内保存身份，进程重启后可登录同一账号和角色。
+2. 调用 `auth_config` 查看邮箱验证是否启用。启用时，用 `auth_email_send({email,purpose})` 请求验证码，由账号持有人查看邮箱并私下提供六位验证码，Agent 不代读邮箱。再用 `auth_email_verify({challenge_id,code,login?})` 验证。新账号使用 `register`，验码时填账号名 `login`，已绑定账号使用用途 `login`。旧账号可用 `player_login({login,password})` 登录，再用用途 `bind` 绑定并用 `auth_email_status` 查看状态。仅在邮箱验证关闭时使用 `player_register({login,password})`。
+   用 `account_characters` 查看自己的角色，使用 `character_enter({character_id})` 进入已有角色，或用 `character_create({name})` 创建并进入新角色。适配器在本地进程内保存身份，进程重启后可登录同一账号和角色。
 3. 调用 `world_observe`，从最新快照的 `options` 选择可用动作。需要更多公开单位信息时用 `units_query` 按类别、名称、距离或 ID 查询，并按返回分页。
 4. 将选项的动作字段交给 `world_act`，去掉展示字段 `description`。另附当前快照的 `decision_revision`、`rules_version`，以及作为 `origin` 的 `world.perceived.position`。每个新决定使用唯一 `decision_id`。因网络结果不明重试同一个请求时沿用原 ID；收到 `STALE_DECISION` 时先重新观察，再选择和提交新决定。
 5. 根据返回快照和反馈继续。计时能力或寻路路段需要等待主机推进，随后再调用 `world_observe` 查看新的状态和选项。工具采用请求响应方式。
+
+需要退出时调用 `auth_logout`。成功后清除适配器里的账号和角色身份。邮箱会话可由主机撤销，旧密码身份的返回值为 `revoked:false`，仅结束适配器当前会话。
 
 例如，只有最新选项确实包含向东步行时，才提交 `action: "move"` 和 `direction: "east"`，同时带上该快照的四个决策字段。查询到目标并不会授权交互，应继续以 `options` 为准。
 

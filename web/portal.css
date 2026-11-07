@@ -593,3 +593,8 @@ legend { font-size: 12px; color: var(--pink) }
 #social-detail-dialog .dialog-heading .icon { flex: 0 0 44px; min-height: 44px; }
 .social-detail-scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 2px 4px 4px; }
 .social-detail-scroll:focus-visible { outline-offset: -2px; }
+.email-auth-heading,.email-auth-actions { display: flex; align-items: center; gap: 8px; }
+.email-auth-heading { justify-content: space-between; }
+.email-auth-heading h2 { margin: 0; }
+.email-auth-close { min-width: 44px; min-height: 44px; font-size: 20px; }
+.email-auth-actions,.email-auth-current,.email-auth-status { overflow-wrap: anywhere; }

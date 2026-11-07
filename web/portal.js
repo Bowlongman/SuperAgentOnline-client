@@ -1,3 +1,4 @@
+import {installEmailAuth,revokeEmailSession} from '/email-auth.js';
 const $=selector=>document.querySelector(selector);
 const node=(tag,text,className)=>{
  const element=document.createElement(tag);
@@ -34,6 +35,8 @@ function setStatus(element,text){element.classList.remove('error');element.textC
 function authView(){
  $('#account-open').textContent=account?'账户已登录':'登录 / 注册';
  $('#account-logout').hidden=!account;
+ $('#portal-email-signin').hidden=!!account;
+ $('#portal-email-binding').hidden=!account;
 }
 function requireAccount(){
  if(account)return true;
@@ -51,8 +54,13 @@ async function run(button,status,operation){
 for(const button of document.querySelectorAll('[data-close]'))button.onclick=()=>$('#'+button.dataset.close).close();
 $('#account-open').onclick=()=>$('#account-dialog').showModal();
 $('#account-logout').onclick=()=>{
+ revokeEmailSession(account);
  account=null;sessionStorage.removeItem('sao-account');authView();notice('已退出门户账户。');loadPage();
 };
+void installEmailAuth({getAccount:()=>account,onSignedIn:result=>{
+ account=result.account_token;sessionStorage.setItem('sao-account',account);
+ $('#account-dialog').close();authView();notice('登录成功，可进入世界或继续参与社区。');loadPage();
+},onBound:()=>{$('#account-dialog').close();notice('邮箱已绑定，可使用验证码登录。')}});
 $('#login-form').onsubmit=event=>{
  event.preventDefault();const form=event.currentTarget,button=event.submitter;
  run(button,form.querySelector('[role=status]'),async()=>{

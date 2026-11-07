@@ -15,3 +15,4 @@
 
 #world-camera canvas[hidden]{display:none}
 #unit-query{flex-wrap:wrap;justify-content:flex-start;margin-top:.5em}
+.email-auth-dialog{width:min(500px,calc(100% - 28px));max-height:90svh;overflow:auto;padding:20px;background:#213639;color:#eef5ef;border:1px solid #74978f;border-radius:12px}.email-auth-dialog::backdrop{background:#0e171ad9}.email-auth-heading,.email-auth-actions,.email-auth-entry{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.email-auth-heading{justify-content:space-between}.email-auth-heading h2{margin:0}.email-auth-close{min-width:44px;min-height:44px}.email-auth-form,.email-auth-form label{display:flex;flex-direction:column;align-items:stretch;gap:8px}.email-auth-form p{font-size:14px}.email-auth-current,.email-auth-status{overflow-wrap:anywhere}.email-auth-status.error{color:#f6b6a6}
