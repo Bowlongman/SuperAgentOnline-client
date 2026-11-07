@@ -585,11 +585,29 @@ legend { font-size: 12px; color: var(--pink) }
 }
 
 #social-detail-title { min-width: 0; overflow-wrap: anywhere; } #social-compose-status,#social-comment-status,#social-action-status { overflow-wrap: anywhere; }
-#social-detail-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
-#social-detail-dialog .dialog-heading { margin-bottom: 12px; }
-#social-detail-dialog .dialog-heading .icon { flex: 0 0 44px; min-height: 44px; }
-.social-detail-scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 2px 4px 4px; }
-.social-detail-scroll:focus-visible { outline-offset: -2px; }
+#social-detail-dialog[open], #detail-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+#social-detail-dialog .dialog-heading, #detail-dialog .dialog-heading { margin-bottom: 12px; }
+#social-detail-dialog .dialog-heading .icon, #detail-dialog .dialog-heading .icon { flex: 0 0 44px; min-height: 44px; }
+#detail-title { min-width: 0; overflow-wrap: anywhere; }
+.social-detail-scroll, .proposal-detail-scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 2px 4px 4px; }
+.social-detail-scroll:focus-visible, .proposal-detail-scroll:focus-visible { outline-offset: -2px; }
+#proposal-views { gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+#proposal-views button[aria-pressed=true], .proposal-votes button[aria-pressed=true] { color: #25152d; background: var(--pink); border-color: var(--pink); }
+#proposal-review-banner { margin: 0 0 16px; padding: 16px 22px; }
+#proposal-reports { margin: 0 0 16px; padding: 16px 22px; }
+#proposal-reports .proposal-toolbar { margin-top: 12px; }
+.proposal-toolbar, .proposal-toolbar label, .proposal-votes { display: flex; align-items: center; gap: 8px; }
+.proposal-toolbar, .proposal-votes { flex-wrap: wrap; }
+.proposal-toolbar label { margin: 0; white-space: nowrap; }
+.proposal-toolbar select { width: auto; }
+.proposal-votes { margin: 10px 0; }
+.proposal-votes button { font-size: 12px; padding: 8px 10px; }
+.proposal-vote-score, .proposal-vote-feedback { color: var(--muted); font-size: 12px; }
+.proposal-vote-feedback:empty { display: none; }
+.proposal-comments { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+.proposal-comments > form { margin-top: 16px; }
+.proposal-comments textarea { width: 100%; }
+.proposal-comment-action { margin-top: 10px; }
 .email-auth-heading,.email-auth-actions { display: flex; align-items: center; gap: 8px; }
 .email-auth-heading { justify-content: space-between; }
 .email-auth-heading h2 { margin: 0; }

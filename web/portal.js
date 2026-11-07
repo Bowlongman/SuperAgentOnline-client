@@ -11,6 +11,9 @@ const action=(text,handler,className)=>{
 };
 let account=sessionStorage.getItem('sao-account'),isAdmin=false,roleRequest,accountEpoch=0,scope='all',pageGeneration=0,detailGeneration=0,manualGeneration=0,workshopMods=[];
 const workshopLimit=12;
+const proposalLimit=12,pendingProposalVotes=new Set();
+let proposalOffset=0,proposalPage,proposalReview=false;
+let proposalReportOffset=0,proposalReportPage,proposalReportEpoch=0;
 let workshopOffset=0,workshopPage=null,workshopRequest,workshopSearchTimer,workshopPollTimer,detailPollTimer,socialController;
 const typeLabels={new_system:'新增系统',change_rules:'修改规则',change_content:'修改内容'};
 const statusLabels={pending:'待评审',accepted:'已采纳',approved:'已通过',rejected:'已拒绝',proposed:'待讨论',implemented:'已实现',draft:'草稿'};
@@ -23,7 +26,7 @@ async function api(path,{method='GET',body,key=account,signal}={}){
  if(!response.ok){
   if(response.status===401&&key&&key===account&&epoch===accountEpoch){setAccount(null);queueMicrotask(loadPage)}
   const error=new Error(value.error||'请求失败');
-  error.issues=value.issues;error.status=response.status;throw error;
+  error.issues=value.issues;error.status=response.status;error.retry_after_ms=value.retry_after_ms;throw error;
  }
  return value;
 }
@@ -49,6 +52,9 @@ function setAccount(key){
  if(key)sessionStorage.setItem('sao-account',key);else sessionStorage.removeItem('sao-account');
  clearTimeout(detailPollTimer);++detailGeneration;
  $('#detail-dialog').close();$('#detail-body').replaceChildren();
+ proposalOffset=0;proposalPage=null;proposalReview=false;$('#proposal-filter').value='all';
+ $('#proposal-list').replaceChildren();updateProposalView();
+ clearProposalReports();
  socialController?.refreshIdentity();authView();
 }
 function loadAccountRole(){
@@ -125,7 +131,7 @@ async function loadPage(){
    await socialController.load();
    if(generation===pageGeneration)await socialController.syncRoute(postId);
   }
-  if(generation===pageGeneration&&!['workshop','community'].includes(current))setStatus(status,'');
+  if(generation===pageGeneration&&!['workshop','community','proposals'].includes(current))setStatus(status,'');
  }catch(error){if(generation===pageGeneration&&error.name!=='AbortError')showError(status,error)}
 }
 window.addEventListener('hashchange',()=>{
@@ -456,44 +462,251 @@ async function loadManual(generation){
  if(topics.firstElementChild)topics.firstElementChild.click();
  else $('#manual-body').replaceChildren(node('p','服务尚未提供开发手册。','empty'));
 }
+function updateProposalView(){
+ $('#proposal-views').hidden=!isAdmin;
+ $('#proposal-review-banner').hidden=!isAdmin||!proposalReview;
+ $('#proposal-reports').hidden=!isAdmin||!proposalReview;
+ for(const tab of $('#proposal-views').querySelectorAll('button'))tab.setAttribute('aria-pressed',String((tab.dataset.proposalView==='review')===proposalReview));
+}
+function proposalPager(busy=false){
+ $('#proposal-list').setAttribute('aria-busy',String(busy));
+ $('#proposal-prev').disabled=busy||proposalOffset===0;
+ $('#proposal-next').disabled=busy||proposalPage?.next_offset==null;
+ $('#proposal-refresh').disabled=busy;
+ $('#proposal-page-info').textContent=busy?'正在读取…':proposalPage?.total?'第 '+(Math.floor(proposalOffset/proposalLimit)+1)+' / '+Math.ceil(proposalPage.total/proposalLimit)+' 页 · 共 '+proposalPage.total+' 条':'暂无提案';
+}
+function paintProposalVotes(group,votes,busy){
+ group.setAttribute('aria-busy',String(busy));
+ for(const control of group.querySelectorAll('button')){
+  const value=Number(control.dataset.vote);
+  control.textContent=value===1?'赞 '+votes.up:'踩 '+votes.down;
+  control.setAttribute('aria-pressed',String(votes.mine===value));control.disabled=busy||group.dataset.voteDisabled==='true';
+ }
+ group.querySelector('.proposal-vote-score').textContent='净赞 '+votes.score;
+}
+function proposalVotes(proposal){
+ const group=node('div',undefined,'proposal-votes');group.dataset.proposalVote=proposal.id;
+ group.dataset.voteDisabled=String(!!account&&proposal.can_vote===false);
+ group.setAttribute('role','group');group.setAttribute('aria-label','提案投票');
+ for(const value of [1,-1]){
+  const control=action('',()=>submitProposalVote(proposal.id,control));control.dataset.vote=value;group.append(control);
+ }
+ const feedback=node('span',undefined,'proposal-vote-feedback');feedback.setAttribute('role','status');
+ group.append(node('span',undefined,'proposal-vote-score'),feedback);
+ paintProposalVotes(group,proposal.votes??{up:0,down:0,score:0,mine:0},pendingProposalVotes.has(proposal.id));return group;
+}
+async function submitProposalVote(id,control){
+ if(pendingProposalVotes.has(id)||!requireAccount())return;
+ const key=account,epoch=accountEpoch,value=control.getAttribute('aria-pressed')==='true'?0:Number(control.dataset.vote);
+ const groups=()=>[...document.querySelectorAll('[data-proposal-vote]')].filter(group=>group.dataset.proposalVote===id);
+ pendingProposalVotes.add(id);
+ for(const group of groups()){
+  group.setAttribute('aria-busy','true');for(const button of group.querySelectorAll('button'))button.disabled=true;
+  setStatus(group.querySelector('.proposal-vote-feedback'),'正在提交投票…');
+ }
+ try{
+  const result=await api('/api/proposals/'+encodeURIComponent(id)+'/vote',{method:'POST',key,body:{value}});
+  if(epoch!==accountEpoch)return;
+  const rank=$('#proposal-sort').value==='top'?'。刷新列表可更新排名。':'';
+  for(const group of groups()){
+   paintProposalVotes(group,result.votes,true);
+   setStatus(group.querySelector('.proposal-vote-feedback'),(value===0?'已取消投票':'投票已更新')+rank);
+  }
+ }catch(error){
+  if(epoch===accountEpoch)for(const group of groups())showError(group.querySelector('.proposal-vote-feedback'),error);
+ }finally{
+  pendingProposalVotes.delete(id);
+  for(const group of groups()){
+   group.setAttribute('aria-busy','false');for(const button of group.querySelectorAll('button'))button.disabled=group.dataset.voteDisabled==='true';
+  }
+ }
+}
 async function loadProposals(generation){
- const value=await api('/api/proposals',{key:null});if(generation!==pageGeneration)return;
- const proposals=value.proposals??[];const list=$('#proposal-list');list.replaceChildren();
+ updateProposalView();proposalPager(true);
+ const status=$('#proposal-filter').value,params=new URLSearchParams({sort:$('#proposal-sort').value,offset:proposalOffset,limit:proposalLimit});
+ if(status!=='all')params.set('status',status);
+ let value;
+ try{value=await api('/api/proposals?'+params)}catch(error){if(generation===pageGeneration)proposalPager();throw error}
+ if(generation!==pageGeneration)return;
+ if(!value.proposals.length&&value.offset>0&&value.offset>=value.total){
+  proposalOffset=Math.max(0,Math.floor((value.total-1)/proposalLimit)*proposalLimit);return loadProposals(generation);
+ }
+ proposalPage=value;proposalOffset=value.offset;
+ const proposals=value.proposals,list=$('#proposal-list');list.replaceChildren();
  for(const proposal of proposals){
   const card=node('article',undefined,'list-card'),top=node('div',undefined,'card-top');
   top.append(node('h3',proposal.title),tag(statusLabels[proposal.status]||proposal.status||'待评审',proposal.status==='accepted'));
   const meta=node('div',undefined,'meta');meta.append(node('span',typeLabels[proposal.type]||proposal.type),node('span',proposal.target_system),node('span','规则版本 '+proposal.rules_version));
-  card.append(top,meta,node('p',proposal.summary),action('阅读提案 →',()=>proposalDetail(proposal.id)));
+  const controls=node('div',undefined,'card-actions');
+  controls.append(proposalVotes(proposal),action(proposalReview&&proposal.can_review?'打开审核 →':'阅读提案 →',()=>proposalDetail(proposal.id)));
+  card.append(top,meta,node('p',proposal.summary),controls);
   list.append(card);
  }
- if(!proposals.length)list.append(node('p','还没有系统提案。可以从一个明确的问题开始。','empty'));
+ if(!proposals.length)list.append(node('p',proposalReview?'当前筛选没有匹配的待审核提案。':'当前筛选没有匹配的系统提案。','empty'));
+ setStatus($('#proposal-status'),'共 '+value.total+' 条提案');proposalPager();
+}
+for(const tab of $('#proposal-views').querySelectorAll('button'))tab.onclick=()=>{
+ if(!isAdmin)return;
+ proposalReview=tab.dataset.proposalView==='review';proposalOffset=0;
+ clearProposalReports();
+ $('#proposal-filter').value=proposalReview?'proposed':'all';loadPage();
+};
+for(const selector of ['#proposal-sort','#proposal-filter'])$(selector).onchange=()=>{proposalOffset=0;loadPage()};
+$('#proposal-refresh').onclick=loadPage;
+$('#proposal-prev').onclick=()=>{proposalOffset=Math.max(0,proposalOffset-proposalLimit);loadPage()};
+$('#proposal-next').onclick=()=>{if(proposalPage?.next_offset!=null){proposalOffset=proposalPage.next_offset;loadPage()}};
+function proposalCommentError(feedback,error){
+ const retry=Number(error.retry_after_ms);
+ if(error.status===429){feedback.textContent=retry>0?'留言操作过于频繁，请 '+Math.ceil(retry/1000)+' 秒后再试。':'留言操作过于频繁，请稍后再试。';feedback.classList.add('error')}
+ else if(error.message==='PROPOSAL_COMMENT_DUPLICATE'){feedback.textContent='这条留言最近已发布，请修改内容后再试。';feedback.classList.add('error')}
+ else showError(feedback,error);
+}
+function openProposalCommentAction(row,id,text,kind,moderation,feedback,active,done){
+ if((moderation&&!isAdmin)||!requireAccount())return;
+ row.querySelector('.proposal-comment-action')?.remove();
+ const confirm=node('form',undefined,'proposal-comment-action');
+ if(kind!=='delete'){
+  const label=node('label','理由'),reason=node('textarea');reason.name='reason';reason.required=true;reason.maxLength=300;reason.rows=2;
+  label.append(reason);confirm.append(label);
+ }
+ const send=node('button','确认'+text,'primary');confirm.append(send,action('取消',()=>confirm.remove()));row.append(confirm);
+ confirm.onsubmit=async event=>{
+  event.preventDefault();if(send.disabled||!active()||(moderation&&!isAdmin)||!requireAccount())return;
+  const body=Object.fromEntries(new FormData(confirm));if(moderation)body.action=moderation;
+  const epoch=accountEpoch;send.disabled=true;setStatus(feedback,'正在提交…');
+  try{
+   await api('/api/proposals/comments/'+encodeURIComponent(id)+'/'+kind,{method:'POST',body});
+   if(epoch!==accountEpoch||!active())return;
+   confirm.remove();await done();
+  }catch(error){if(epoch===accountEpoch&&active())proposalCommentError(feedback,error)}
+  finally{send.disabled=false}
+ };
+}
+function clearProposalReports(){
+ ++proposalReportEpoch;proposalReportOffset=0;proposalReportPage=null;
+ $('#proposal-reports').open=false;$('#proposal-report-filter').value='pending';
+ $('#proposal-report-list').replaceChildren();setStatus($('#proposal-report-status'),'');
+ $('#proposal-report-page-info').textContent='';$('#proposal-report-prev').disabled=$('#proposal-report-next').disabled=true;
+}
+async function loadProposalReports(){
+ if(!isAdmin||!proposalReview||!$('#proposal-reports').open)return;
+ const epoch=++proposalReportEpoch,feedback=$('#proposal-report-status'),list=$('#proposal-report-list');
+ const prev=$('#proposal-report-prev'),next=$('#proposal-report-next');prev.disabled=next.disabled=true;
+ setStatus(feedback,'正在读取留言举报…');
+ try{
+  const params=new URLSearchParams({offset:proposalReportOffset,limit:proposalLimit,status:$('#proposal-report-filter').value});
+  const result=await api('/api/proposals/comments/reports?'+params);
+  if(epoch!==proposalReportEpoch||!isAdmin||!proposalReview)return;
+  if(!result.reports.length&&result.offset>0&&result.offset>=result.total){proposalReportOffset=Math.max(0,Math.floor((result.total-1)/proposalLimit)*proposalLimit);return loadProposalReports()}
+  proposalReportPage=result;proposalReportOffset=result.offset;list.replaceChildren();
+  for(const report of result.reports){
+   const row=node('article',undefined,'social-report');
+   row.append(node('p',report.reason),node('p',report.reporter+' · '+new Date(report.created_at).toLocaleString('zh-CN')+(report.reviewed_at?' · 已处理':' · 待处理'),'help'));
+   const controls=node('div',undefined,'card-actions');controls.append(action('打开目标提案 →',()=>proposalDetail(report.proposal_id)));
+   if(['public','hidden'].includes(report.comment_status)){
+    const moderation=report.comment_status==='hidden'?'restore':'hide',label=moderation==='hide'?'隐藏留言':'恢复留言';
+    controls.append(action(label,()=>openProposalCommentAction(row,report.comment_id,label,'moderate',moderation,feedback,()=>isAdmin&&proposalReview&&epoch===proposalReportEpoch,async()=>{
+     await loadProposalReports();notice('留言状态已更新。');
+    })));
+   }
+   row.append(controls);list.append(row);
+  }
+  if(!result.reports.length)list.append(node('p','当前没有匹配的留言举报。','empty'));
+  $('#proposal-report-page-info').textContent='共 '+result.total+' 条举报';setStatus(feedback,'');
+  prev.disabled=proposalReportOffset===0;next.disabled=result.next_offset==null;
+ }catch(error){if(epoch===proposalReportEpoch&&isAdmin)showError(feedback,error)}
+}
+$('#proposal-reports').ontoggle=()=>loadProposalReports();
+$('#proposal-report-filter').onchange=()=>{proposalReportOffset=0;loadProposalReports()};
+$('#proposal-report-refresh').onclick=loadProposalReports;
+$('#proposal-report-prev').onclick=()=>{proposalReportOffset=Math.max(0,proposalReportOffset-proposalLimit);loadProposalReports()};
+$('#proposal-report-next').onclick=()=>{if(proposalReportPage?.next_offset!=null){proposalReportOffset=proposalReportPage.next_offset;loadProposalReports()}};
+function proposalComments(id,generation){
+ const section=node('section',undefined,'proposal-comments'),list=node('div',undefined,'proposal-comment-list');
+ const feedback=node('p');feedback.setAttribute('role','status');
+ const pager=node('nav',undefined,'workshop-pagination');pager.setAttribute('aria-label','提案留言分页');
+ const info=node('p'),prev=action('← 上一页',()=>load(Math.max(0,offset-proposalLimit))),next=action('下一页 →',()=>load(page.next_offset));
+ pager.append(prev,info,next);prev.disabled=next.disabled=true;
+ const form=node('form'),label=node('label','发表留言'),input=node('textarea'),submit=node('button','发布留言','primary');
+ input.name='body';input.required=true;input.maxLength=1000;input.rows=4;label.append(input);form.append(label,submit);
+ section.append(node('h3','提案留言'),feedback,list,pager,form);
+ let page,offset=0,epoch=0;
+ function addCommentActions(row,comment){
+  const controls=node('div',undefined,'card-actions');
+  function offer(text,kind,moderation){
+   controls.append(action(text,()=>openProposalCommentAction(row,comment.id,text,kind,moderation,feedback,()=>generation===detailGeneration,async()=>{
+    if(kind==='report')setStatus(feedback,'留言举报已提交。');
+    else{await load(offset);setStatus(feedback,'留言状态已更新。');void loadProposalReports()}
+   })));
+  }
+  if(comment.can_delete)offer('删除','delete');
+  if(comment.can_report||(!account&&comment.status==='public'))offer('举报','report');
+  if(isAdmin&&comment.can_moderate)offer(comment.status==='hidden'?'恢复公开':'隐藏', 'moderate',comment.status==='hidden'?'restore':'hide');
+  if(controls.childElementCount)row.append(controls);
+ }
+ async function load(nextOffset){
+  const request=++epoch;list.setAttribute('aria-busy','true');prev.disabled=next.disabled=true;
+  setStatus(feedback,'正在读取留言…');
+  try{
+   const params=new URLSearchParams({offset:nextOffset,limit:proposalLimit});
+   const result=await api('/api/proposals/'+encodeURIComponent(id)+'/comments?'+params);
+   if(request!==epoch||generation!==detailGeneration)return;
+   if(!result.comments.length&&result.offset>0&&result.offset>=result.total)return load(Math.max(0,Math.floor((result.total-1)/proposalLimit)*proposalLimit));
+   page=result;offset=result.offset;list.replaceChildren();
+   for(const comment of result.comments){
+    const row=node('article',undefined,'social-comment');
+    const meta=node('div',undefined,'meta');meta.append(node('span',comment.author));
+    if(comment.created_at)meta.append(node('time',new Date(comment.created_at).toLocaleString('zh-CN')));
+    if(comment.status==='hidden')meta.append(tag('已隐藏'));
+    row.append(meta,node('p',comment.body,'social-full-text'));addCommentActions(row,comment);list.append(row);
+   }
+   if(!result.comments.length)list.append(node('p','还没有留言。','empty'));
+   info.textContent='共 '+result.total+' 条留言';setStatus(feedback,'');
+  }catch(error){if(request===epoch&&generation===detailGeneration)proposalCommentError(feedback,error)}
+  finally{if(request===epoch){list.setAttribute('aria-busy','false');prev.disabled=offset===0;next.disabled=page?.next_offset==null}}
+ }
+ form.onsubmit=async event=>{
+  event.preventDefault();if(submit.disabled||!requireAccount())return;
+  submit.disabled=true;setStatus(feedback,'正在发布…');
+  try{
+   await api('/api/proposals/'+encodeURIComponent(id)+'/comments',{method:'POST',body:{body:input.value}});
+   if(generation!==detailGeneration)return;
+   form.reset();await load(offset);setStatus(feedback,'留言已发布。');
+  }catch(error){if(generation===detailGeneration)proposalCommentError(feedback,error)}
+  finally{submit.disabled=false}
+ };
+ void load(0);return section;
 }
 async function proposalDetail(id){
  clearTimeout(detailPollTimer);
  const generation=++detailGeneration,dialog=$('#detail-dialog'),body=$('#detail-body');
  $('#detail-title').textContent='系统提案';body.replaceChildren();setStatus($('#detail-status'),'正在读取…');
  if(!dialog.open)dialog.showModal();
+ $('.proposal-detail-scroll').scrollTop=0;
  try{
-  const value=await api('/api/proposals/'+encodeURIComponent(id),{key:null});if(generation!==detailGeneration)return;
+  const value=await api('/api/proposals/'+encodeURIComponent(id));if(generation!==detailGeneration)return;
   const proposal=value.proposal??value;$('#detail-title').textContent=proposal.title;
   body.append(tag(statusLabels[proposal.status]||proposal.status||'待评审',proposal.status==='accepted'));
   for(const [key,title] of Object.entries({type:'提案类型',summary:'概要',target_system:'目标系统',rules_version:'规则版本',design:'设计说明',compatibility:'兼容性与迁移',acceptance:'验收条件',state:'状态 state',decisions:'决策 decisions',result:'结果 result',reason:'评审意见'}))detailField(body,title,key==='type'?typeLabels[proposal.type]:proposal[key]);
-  if(!isAdmin){setStatus($('#detail-status'),'');return}
+  body.append(proposalVotes(proposal));
+  if(!isAdmin||!proposalReview||!proposal.can_review){body.append(proposalComments(id,generation));setStatus($('#detail-status'),'');return}
   const review=node('form',undefined,'review-form'),heading=node('h3','主机管理员评审');
   const label=node('label','评审结果'),select=node('select');select.name='status';
   for(const [value,text] of [['proposed','待讨论'],['accepted','已采纳'],['rejected','已拒绝'],['implemented','已实现']]){const option=node('option',text);option.value=value;select.append(option)}
+  select.value=proposal.status;
   label.append(select);const reasonLabel=node('label','评审理由'),reason=node('textarea');reason.name='reason';reason.required=true;reason.rows=3;reasonLabel.append(reason);
   const submit=node('button','保存评审','primary');submit.type='submit';review.append(heading,label,reasonLabel,submit);
   review.onsubmit=event=>{
-   event.preventDefault();if(!isAdmin)return;
-   const key=account;
+   event.preventDefault();if(!isAdmin||!proposalReview)return;
+   const key=account,epoch=accountEpoch;
    run(submit,$('#detail-status'),async()=>{
     await api('/api/proposals/'+encodeURIComponent(id)+'/review',{method:'POST',key,body:Object.fromEntries(new FormData(review))});
-    if(key!==account)return;
-    await proposalDetail(id);notice('评审意见已保存。');
+    if(epoch!==accountEpoch)return;
+    await loadPage();if(generation===detailGeneration)await proposalDetail(id);
+    notice('评审意见已保存。');
    });
   };
-  body.append(review);setStatus($('#detail-status'),'“已实现”表示管理员人工记录的验收进度。');
+  body.append(review,proposalComments(id,generation));setStatus($('#detail-status'),'“已实现”表示管理员人工记录的验收进度。');
  }catch(error){if(generation===detailGeneration)showError($('#detail-status'),error)}
 }
 $('#proposal-open').onclick=()=>{if(requireAccount())$('#proposal-dialog').showModal()};
