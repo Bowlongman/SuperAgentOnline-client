@@ -68,7 +68,8 @@ function configureStoryNarrative(){
  const visuals=document.createElement('div');visuals.className='story-stage-images';visuals.setAttribute('aria-hidden','true');
  const frames=scenes.map((scene,index)=>{
   const frame=document.createElement('div');frame.className='story-stage-frame';frame.dataset.storyIndex=index;
-  const image=scene.querySelector('.story-visual img').cloneNode();image.alt='';frame.append(image);visuals.append(frame);return frame;
+  const picture=scene.querySelector('.story-visual picture').cloneNode(true);
+  picture.querySelector('img').alt='';frame.append(picture);visuals.append(frame);return frame;
  });
  const caption=document.createElement('p');caption.className='story-stage-caption';caption.setAttribute('aria-hidden','true');
  const progress=document.createElement('nav');progress.className='story-progress';progress.setAttribute('aria-label','故事章节');

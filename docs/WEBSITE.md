@@ -20,9 +20,15 @@ python -m http.server --bind 127.0.0.1 --directory web 8080
 
 预览包含官网布局、样式、插图与滚动动效。Python 静态服务器按文件名提供页面，`/` 会匹配 `index.html`，因此官网预览应直接打开 `/portal.html`。正式站的 `/game`、`/portal` 等路由由主机映射。
 
+官网的主视觉、角色图和三张故事插图通过 `<picture>` 优先提供 WebP，并保留 PNG 供不支持 WebP 的浏览器使用。部署时保留两种格式，并为 WebP 使用 `image/webp` 内容类型。
+
 ## 在线功能
 
 门户请求相对路径下的 `/api/*`。登录、下载清单、工坊、提案和社群需要同源的兼容游戏主机。游戏和工作台还需要主机提供角色、地图与模型资源。GitHub Pages 可托管静态文件，但不会提供这些业务接口、账户存档或运行中的世界；官网使用以站点根路径开头的资源 URL，部署到子目录时也需配置对应路由。
+
+主机可为静态文件返回 `ETag`。浏览器用 `If-None-Match` 复查时，标签匹配即可返回 `304 Not Modified`，重用已有内容。业务 API 使用 `Cache-Control: no-store`。
+
+Windows 客户端可从 [GitHub Releases](https://github.com/Bowlongman/SuperAgentOnline-client/releases/latest) 或 [官网下载页](https://superagentonline.com/portal#downloads) 提供的镜像获取。同一版本的两处 ZIP 应具有相同的 SHA-256。下载后可用 PowerShell 的 `Get-FileHash -Algorithm SHA256 <ZIP路径>` 与官网公布的摘要比对。
 
 官网用 `/guides/` 和 `/skills/` 提供规则与 Agent 技能下载。静态预览从 `web/guides/` 和 `web/skills/` 提供同一路径的副本。仓库中的配套说明与技能也可在 `docs/` 和 `skills/` 阅读。
 

@@ -139,6 +139,11 @@ function githubLink(label,url,primary=false){
  link.href=url;link.target='_blank';link.rel='noopener noreferrer';
  return link;
 }
+function downloadLink(label,url,filename,primary=false){
+ const link=node('a',label,primary?'button primary':'button');
+ link.href=url;link.download=filename||'';
+ return link;
+}
 async function loadDownloads(generation){
  const value=await api('/api/downloads',{key:null});if(generation!==pageGeneration)return;
  const list=$('#download-list');list.replaceChildren();
@@ -160,10 +165,12 @@ async function loadDownloads(generation){
   const github=githubRelease(file);
   if(github){
    const actions=node('div',undefined,'actions download-links');
-   copy.append(node('p','客户端通过 GitHub Releases 发布。下载、发布说明和项目仓库将在新标签页打开。'));
-   actions.append(githubLink('从 GitHub 下载 ↓',github.asset,true),githubLink('发布说明 ↗',github.release),githubLink('客户端仓库 ↗',github.repository));
+   copy.append(node('p',url?'可从 GitHub Releases 或官网镜像下载同一客户端。GitHub 链接将在新标签页打开。':'客户端通过 GitHub Releases 发布。GitHub 链接将在新标签页打开。'));
+   actions.append(githubLink('从 GitHub 下载 ↓',github.asset,true));
+   if(url)actions.append(downloadLink('官网下载镜像 ↓',url,file.filename));
+   actions.append(githubLink('发布说明 ↗',github.release),githubLink('客户端仓库 ↗',github.repository));
    card.append(actions);
-  }else if(url){const link=node('a','下载文件 ↓','button primary');link.href=url;link.setAttribute('download',file.filename||'');card.append(link)}
+  }else if(url)card.append(downloadLink('下载文件 ↓',url,file.filename,true));
   else card.append(node('span','下载尚未就绪','tag'));
   list.append(card);
  }
